@@ -14,21 +14,48 @@
     });
   });
 
-  // Inquiry form: client-side validation + confirmation state.
-  // TODO: wire this up to a real submission endpoint (e.g. Formspree,
-  // Netlify Forms, or a serverless function forwarding to the RRCL
-  // Office 365 mailbox) once that mailbox is provisioned — right now
-  // submitting only shows the confirmation panel, it does not send mail.
+  // Inquiry form: submits to Web3Forms, which emails the submission to
+  // the company inbox tied to the access_key in the hidden field below.
   const form = document.getElementById('inquiryForm');
   const formPanel = document.getElementById('formPanel');
   const confirmPanel = document.getElementById('confirmPanel');
+  const submitBtn = form.querySelector('button[type="submit"]');
 
-  form.addEventListener('submit', (event) => {
+  let formError = document.createElement('p');
+  formError.className = 'form-note';
+  formError.style.color = '#b3261e';
+  formError.hidden = true;
+  form.querySelector('.form-note').after(formError);
+
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity()) return;
 
-    formPanel.hidden = true;
-    confirmPanel.hidden = false;
-    confirmPanel.focus();
+    formError.hidden = true;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: new FormData(form),
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        formPanel.hidden = true;
+        confirmPanel.hidden = false;
+        confirmPanel.focus();
+      } else {
+        throw new Error(result.message || 'Submission failed');
+      }
+    } catch (err) {
+      formError.hidden = false;
+      formError.textContent = 'Something went wrong sending your message — please try again, or email us directly.';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send inquiry';
+    }
   });
 })();
